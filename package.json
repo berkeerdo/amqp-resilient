@@ -1,6 +1,6 @@
 {
   "name": "amqp-resilient",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Production-ready AMQP client with retry, reconnection, and resilience patterns for Node.js",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -34,17 +34,24 @@
   "keywords": [
     "amqp",
     "rabbitmq",
+    "rabbitmq-client",
     "queue",
     "message-queue",
+    "message-broker",
     "resilient",
     "retry",
     "reconnection",
     "circuit-breaker",
+    "dead-letter-queue",
+    "dlq",
+    "exponential-backoff",
+    "health-check",
     "consumer",
     "publisher",
     "microservices",
     "typescript",
-    "nodejs"
+    "nodejs",
+    "esm"
   ],
   "author": "berkeerdo",
   "license": "MIT",
