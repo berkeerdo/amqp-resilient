@@ -23,12 +23,16 @@ export interface ConnectionOptions {
   host?: string;
   /** RabbitMQ port (default: 5672) */
   port?: number;
+  /** RabbitMQ management port (default: 15672) */
+  managementPort?: number;
   /** RabbitMQ username */
   username?: string;
   /** RabbitMQ password */
   password?: string;
   /** RabbitMQ virtual host (default: /) */
   vhost?: string;
+  /** Automatically create vhost if it doesn't exist (default: false) */
+  autoCreateVhost?: boolean;
   /** Connection name for identification (default: default) */
   connectionName?: string;
   /** Prefetch count for channels (default: 10) */

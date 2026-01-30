@@ -29,6 +29,7 @@ const DEFAULTS = {
   MAX_RECONNECT_ATTEMPTS: 0, // unlimited
   HEARTBEAT_SECONDS: 60,
   PREFETCH: 10,
+  MANAGEMENT_PORT: 15672,
 };
 
 /**
@@ -53,6 +54,14 @@ export class ConnectionManager {
   private readonly initialReconnectDelay: number;
   private readonly maxReconnectDelay: number;
 
+  // Connection params for vhost management
+  private readonly host?: string;
+  private readonly managementPort: number;
+  private readonly username: string;
+  private readonly password: string;
+  private readonly vhost: string;
+  private readonly autoCreateVhost: boolean;
+
   constructor(options: ConnectionOptions) {
     this.connectionName = options.connectionName ?? 'default';
     this.prefetch = options.prefetch ?? DEFAULTS.PREFETCH;
@@ -62,15 +71,23 @@ export class ConnectionManager {
     this.maxReconnectDelay = options.maxReconnectDelay ?? DEFAULTS.MAX_RECONNECT_DELAY;
     this.logger = options.logger ?? noopLogger;
 
+    // Store connection params for vhost management
+    this.host = options.host;
+    this.managementPort = options.managementPort ?? DEFAULTS.MANAGEMENT_PORT;
+    this.username = options.username ?? 'guest';
+    this.password = options.password ?? 'guest';
+    this.vhost = options.vhost ?? '/';
+    this.autoCreateVhost = options.autoCreateVhost ?? false;
+
     // Build connection URL from individual params or use provided URL
     if (options.url) {
       this.connectionUrl = options.url;
     } else if (options.host) {
-      const username = encodeURIComponent(options.username ?? 'guest');
-      const password = encodeURIComponent(options.password ?? 'guest');
+      const username = encodeURIComponent(this.username);
+      const password = encodeURIComponent(this.password);
       const host = options.host;
       const port = options.port ?? 5672;
-      const vhost = encodeURIComponent(options.vhost ?? '/');
+      const vhost = encodeURIComponent(this.vhost);
       this.connectionUrl = `amqp://${username}:${password}@${host}:${port}/${vhost}`;
     } else {
       throw new Error('ConnectionManager requires either url or host parameter');
@@ -125,6 +142,83 @@ export class ConnectionManager {
   }
 
   /**
+   * Ensure vhost exists (create if not)
+   * Uses RabbitMQ Management HTTP API
+   */
+  private async ensureVhost(): Promise<void> {
+    if (!this.autoCreateVhost || !this.host || this.vhost === '/') {
+      return;
+    }
+
+    const encodedVhost = encodeURIComponent(this.vhost);
+    const baseUrl = `http://${this.host}:${this.managementPort}/api`;
+    const authHeader = `Basic ${Buffer.from(`${this.username}:${this.password}`).toString('base64')}`;
+
+    try {
+      // Check if vhost exists
+      const checkResponse = await fetch(`${baseUrl}/vhosts/${encodedVhost}`, {
+        method: 'GET',
+        headers: { Authorization: authHeader },
+      });
+
+      if (checkResponse.status === 200) {
+        this.logger.debug({ vhost: this.vhost }, 'Vhost already exists');
+        return;
+      }
+
+      if (checkResponse.status !== 404) {
+        this.logger.warn(
+          { vhost: this.vhost, status: checkResponse.status },
+          'Unexpected response checking vhost'
+        );
+        return;
+      }
+
+      // Create vhost
+      this.logger.info({ vhost: this.vhost }, 'Creating vhost...');
+      const createResponse = await fetch(`${baseUrl}/vhosts/${encodedVhost}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ description: `Auto-created by ${this.connectionName}` }),
+      });
+
+      if (!createResponse.ok) {
+        throw new Error(
+          `Failed to create vhost: ${createResponse.status} ${createResponse.statusText}`
+        );
+      }
+
+      // Set permissions for the user
+      const encodedUsername = encodeURIComponent(this.username);
+      const permResponse = await fetch(
+        `${baseUrl}/permissions/${encodedVhost}/${encodedUsername}`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: authHeader,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ configure: '.*', write: '.*', read: '.*' }),
+        }
+      );
+
+      if (!permResponse.ok) {
+        throw new Error(
+          `Failed to set vhost permissions: ${permResponse.status} ${permResponse.statusText}`
+        );
+      }
+
+      this.logger.info({ vhost: this.vhost }, 'Vhost created and permissions set');
+    } catch (error) {
+      this.logger.error({ err: error, vhost: this.vhost }, 'Failed to ensure vhost exists');
+      // Don't throw - let the connection attempt proceed and fail with a clearer error
+    }
+  }
+
+  /**
    * Connect to AMQP server
    */
   async connect(): Promise<void> {
@@ -135,6 +229,9 @@ export class ConnectionManager {
     HealthService.registerStatus(this.connectionName, ConnectionStatus.CONNECTING);
 
     try {
+      // Ensure vhost exists before connecting
+      await this.ensureVhost();
+
       this.logger.info({ connectionName: this.connectionName }, 'Connecting to AMQP server...');
       this.connection = await amqplib.connect(this.connectionUrl, { heartbeat: this.heartbeat });
       this.reconnectAttempts = 0;
@@ -277,7 +374,10 @@ export class ConnectionManager {
       await this.confirmChannel.prefetch(this.prefetch);
 
       this.confirmChannel.on('error', (err: Error) => {
-        this.logger.error({ err, connectionName: this.connectionName }, 'AMQP confirm channel error');
+        this.logger.error(
+          { err, connectionName: this.connectionName },
+          'AMQP confirm channel error'
+        );
         this.confirmChannel = null;
       });
 
@@ -346,7 +446,10 @@ export class ConnectionManager {
       this.createdChannels.clear();
 
       HealthService.unregisterConnection(this.connectionName);
-      this.logger.info({ connectionName: this.connectionName }, 'AMQP connection closed gracefully');
+      this.logger.info(
+        { connectionName: this.connectionName },
+        'AMQP connection closed gracefully'
+      );
     } catch (error) {
       this.logger.error(
         { err: error, connectionName: this.connectionName },
