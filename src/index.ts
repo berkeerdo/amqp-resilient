@@ -18,6 +18,9 @@ export { CircuitBreaker, CircuitBreakerOpenError } from './patterns/CircuitBreak
 // Health
 export { HealthService } from './health/HealthService.js';
 
+// DLQ Management
+export { DlqManager, type DlqMessageInfo, type DlqDepthInfo } from './health/DlqManager.js';
+
 // Types
 export {
   // Logger

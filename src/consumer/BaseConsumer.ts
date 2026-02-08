@@ -17,6 +17,7 @@
 import type { Channel, ConsumeMessage } from 'amqplib';
 import type { ConnectionManager } from '../connection/ConnectionManager.js';
 import { CircuitBreaker, CircuitBreakerOpenError } from '../patterns/CircuitBreaker.js';
+import { HealthService } from '../health/HealthService.js';
 import type { AmqpLogger, ConsumerOptions, MessageContext } from '../types.js';
 
 /** Default retry configuration */
@@ -189,6 +190,7 @@ export abstract class BaseConsumer<T = unknown> {
       await this.bindRoutingKeys();
 
       this.isInitialized = true;
+      HealthService.registerDlq(this.getDlqName(), this.queue);
       this.logger.info(
         {
           queue: this.queue,

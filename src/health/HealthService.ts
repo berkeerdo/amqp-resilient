@@ -9,6 +9,7 @@ import { ConnectionStatus } from '../types.js';
  */
 class HealthServiceClass {
   private connectionStatuses = new Map<string, ConnectionStatus>();
+  private registeredDlqs = new Map<string, string>(); // dlqName → originalQueue
 
   /**
    * Register or update a connection's status
@@ -88,10 +89,25 @@ class HealthServiceClass {
   }
 
   /**
-   * Clear all connections (useful for testing)
+   * Register a DLQ and its original queue mapping
+   */
+  registerDlq(dlqName: string, originalQueue: string): void {
+    this.registeredDlqs.set(dlqName, originalQueue);
+  }
+
+  /**
+   * Get all registered DLQ mappings
+   */
+  getRegisteredDlqs(): Map<string, string> {
+    return new Map(this.registeredDlqs);
+  }
+
+  /**
+   * Clear all connections and DLQ registrations (useful for testing)
    */
   clear(): void {
     this.connectionStatuses.clear();
+    this.registeredDlqs.clear();
   }
 }
 
