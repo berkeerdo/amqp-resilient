@@ -79,7 +79,7 @@ export class DlqManager {
         const msg = await channel.get(dlqName, { noAck: false });
         if (!msg) break;
 
-        const rawHeaders = msg.properties.headers as Record<string, unknown> | undefined;
+        const rawHeaders = msg.properties.headers;
         const headers: Record<string, unknown> = rawHeaders ?? {};
         const content = this.parseContent(msg.content);
 
@@ -133,7 +133,7 @@ export class DlqManager {
         const msg = await channel.get(dlqName, { noAck: false });
         if (!msg) break;
 
-        const rawHeaders = msg.properties.headers as Record<string, unknown> | undefined;
+        const rawHeaders = msg.properties.headers;
         const headers: Record<string, unknown> = rawHeaders ?? {};
         const originalExchange = (headers['x-original-exchange'] as string) || '';
         const originalRoutingKey =

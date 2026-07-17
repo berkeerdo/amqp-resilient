@@ -104,7 +104,10 @@ export class CircuitBreaker {
     if (this.state === CircuitState.HALF_OPEN) {
       // Any failure in half-open state reopens the circuit
       this.transitionTo(CircuitState.OPEN);
-    } else if (this.state === CircuitState.CLOSED && this.failures.length >= this.failureThreshold) {
+    } else if (
+      this.state === CircuitState.CLOSED &&
+      this.failures.length >= this.failureThreshold
+    ) {
       this.transitionTo(CircuitState.OPEN);
     }
   }

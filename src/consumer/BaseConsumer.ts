@@ -240,7 +240,7 @@ export abstract class BaseConsumer<T = unknown> {
     const messageId = (msg.properties.messageId as string) || `auto-${Date.now()}`;
     const correlationId = msg.properties.correlationId as string | undefined;
     const retryCount = this.getRetryCount(msg);
-    const rawHeaders = msg.properties.headers as Record<string, unknown> | undefined;
+    const rawHeaders = msg.properties.headers;
     const headers: Record<string, unknown> = rawHeaders ?? {};
 
     const context: MessageContext = {
@@ -357,7 +357,7 @@ export abstract class BaseConsumer<T = unknown> {
     newRetryCount: number,
     errorMessage: string
   ): Record<string, unknown> {
-    const existingHeaders = msg.properties.headers as Record<string, unknown> | undefined;
+    const existingHeaders = msg.properties.headers;
     const firstFailureTime = getHeaderValue(existingHeaders, HEADER.FIRST_FAILURE_TIME);
     const firstFailure = typeof firstFailureTime === 'number' ? firstFailureTime : Date.now();
 
@@ -446,7 +446,7 @@ export abstract class BaseConsumer<T = unknown> {
    * Get retry count from message headers
    */
   private getRetryCount(msg: ConsumeMessage): number {
-    const headers = msg.properties.headers as Record<string, unknown> | undefined;
+    const headers = msg.properties.headers;
     const retryCount = getHeaderValue(headers, HEADER.RETRY_COUNT);
     return typeof retryCount === 'number' ? retryCount : 0;
   }
